@@ -22,33 +22,70 @@ type KanbanActions = {
   removeTask: (taskId: string) => void
 }
 
-export const useKanbanStore = create<KanbanState & KanbanActions>((set) => ({
+// Helper function to check if tasks array has actually changed
+function tasksEqual(a: Task[], b: Task[]): boolean {
+  if (a.length !== b.length) return false
+  return a.every((task, index) => {
+    const other = b[index]
+    return (
+      task.id === other.id &&
+      task.title === other.title &&
+      task.description === other.description &&
+      task.status === other.status &&
+      task.order === other.order &&
+      task.updatedAt === other.updatedAt
+    )
+  })
+}
+
+export const useKanbanStore = create<KanbanState & KanbanActions>((set, get) => ({
   tasks: persisted?.tasks ?? [],
   lastSyncedAt: persisted?.lastSyncedAt,
   hydrated: Boolean(persisted),
-  setTasks: (tasks, options) =>
-    set({
-      tasks: sortTasks(tasks),
-      lastSyncedAt: options?.lastSyncedAt ?? new Date().toISOString(),
-      hydrated: true,
-    }),
+  setTasks: (tasks, options) => {
+    const sortedTasks = sortTasks(tasks)
+    const currentTasks = get().tasks
+    
+    // Only update if tasks actually changed
+    if (!tasksEqual(currentTasks, sortedTasks)) {
+      set({
+        tasks: sortedTasks,
+        lastSyncedAt: options?.lastSyncedAt ?? new Date().toISOString(),
+        hydrated: true,
+      })
+    }
+  },
   reconcileWithServer: (tasks) =>
-    set((state) => ({
-      tasks: mergeServerState(state.tasks, tasks),
-      lastSyncedAt: new Date().toISOString(),
-      hydrated: true,
-    })),
+    set((state) => {
+      const mergedTasks = mergeServerState(state.tasks, tasks)
+      
+      // Only update if tasks actually changed
+      if (!tasksEqual(state.tasks, mergedTasks)) {
+        return {
+          tasks: mergedTasks,
+          lastSyncedAt: new Date().toISOString(),
+          hydrated: true,
+        }
+      }
+      return state
+    }),
   addTask: (input) =>
     set((state) => ({
       tasks: applyTaskMutation(state.tasks, { type: 'add', payload: input }),
     })),
   moveTask: ({ taskId, status, position }) =>
-    set((state) => ({
-      tasks: applyTaskMutation(state.tasks, {
+    set((state) => {
+      const newTasks = applyTaskMutation(state.tasks, {
         type: 'move',
         payload: { taskId, status, position },
-      }),
-    })),
+      })
+      
+      // Only update if tasks actually changed
+      if (!tasksEqual(state.tasks, newTasks)) {
+        return { tasks: newTasks }
+      }
+      return state
+    }),
   updateTask: (taskId, changes) =>
     set((state) => ({
       tasks: applyTaskMutation(state.tasks, {
@@ -66,11 +103,19 @@ export const useKanbanStore = create<KanbanState & KanbanActions>((set) => ({
 }))
 
 if (typeof window !== 'undefined') {
+  let previousTasks: Task[] = useKanbanStore.getState().tasks
+  
   useKanbanStore.subscribe((state) => {
-    persistState({
-      tasks: state.tasks,
-      lastSyncedAt: state.lastSyncedAt,
-    })
+    const currentTasks = state.tasks
+    
+    // Only persist if tasks actually changed (not just reference)
+    if (!tasksEqual(currentTasks, previousTasks)) {
+      persistState({
+        tasks: currentTasks,
+        lastSyncedAt: state.lastSyncedAt,
+      })
+      previousTasks = currentTasks
+    }
   })
 }
 

@@ -30,8 +30,36 @@ const STATUS_ORDER = TASK_STATUSES.reduce<Record<TaskStatus, number>>((acc, stat
   return acc
 }, {} as Record<TaskStatus, number>)
 
-export const sortTasks = (tasks: Task[]) =>
-  [...tasks].sort((a, b) => {
+export const sortTasks = (tasks: Task[]): Task[] => {
+  // Check if sorting is actually needed
+  let needsSorting = false
+  for (let i = 1; i < tasks.length; i++) {
+    const prev = tasks[i - 1]
+    const curr = tasks[i]
+    
+    if (prev.status !== curr.status) {
+      if (STATUS_ORDER[prev.status] > STATUS_ORDER[curr.status]) {
+        needsSorting = true
+        break
+      }
+    } else if (prev.order !== curr.order) {
+      if (prev.order > curr.order) {
+        needsSorting = true
+        break
+      }
+    } else if (prev.updatedAt.localeCompare(curr.updatedAt) > 0) {
+      needsSorting = true
+      break
+    }
+  }
+  
+  // Return the same array reference if no sorting is needed
+  if (!needsSorting) {
+    return tasks
+  }
+  
+  // Only create a new array if sorting is actually needed
+  return [...tasks].sort((a, b) => {
     if (a.status !== b.status) {
       return STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
     }
@@ -40,6 +68,7 @@ export const sortTasks = (tasks: Task[]) =>
     }
     return a.updatedAt.localeCompare(b.updatedAt)
   })
+}
 
 export function mergeServerState(localTasks: Task[], serverTasks: Task[]): Task[] {
   const merged = new Map<string, Task>()

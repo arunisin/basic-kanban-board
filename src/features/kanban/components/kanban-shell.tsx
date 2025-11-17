@@ -111,10 +111,8 @@ function DroppableColumn({ status, tasks, children }: DroppableColumnProps) {
 }
 
 export function KanbanShell() {
-  const { tasks, moveTask } = useKanbanStore((state) => ({
-    tasks: state.tasks,
-    moveTask: state.moveTask,
-  }))
+  const tasks = useKanbanStore((state) => state.tasks)
+  const moveTask = useKanbanStore((state) => state.moveTask)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
 
   const sensors = useSensors(
@@ -125,12 +123,31 @@ export function KanbanShell() {
     })
   )
 
+  // Use a stable reference for tasks to prevent infinite loops
+  const stableTasks = useMemo(() => tasks, [tasks])
+  
   const grouped = useMemo(() => {
+    const tasksByStatus = new Map<TaskStatus, Task[]>()
+    
+    // Initialize all statuses with empty arrays
+    TASK_STATUSES.forEach(status => {
+      tasksByStatus.set(status, [])
+    })
+    
+    // Group tasks by status
+    stableTasks.forEach(task => {
+      const statusTasks = tasksByStatus.get(task.status)
+      if (statusTasks) {
+        statusTasks.push(task)
+      }
+    })
+    
+    // Return the grouped result
     return TASK_STATUSES.map((status) => ({
       status,
-      tasks: tasks.filter((task) => task.status === status),
+      tasks: tasksByStatus.get(status) || [],
     }))
-  }, [tasks])
+  }, [stableTasks])
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event
