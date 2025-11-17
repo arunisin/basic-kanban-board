@@ -151,9 +151,9 @@ export function KanbanShell() {
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event
-    const task = tasks.find((task) => task.id === active.id)
+    const task = stableTasks.find((task) => task.id === active.id)
     setActiveTask(task || null)
-  }, [tasks])
+  }, [stableTasks])
 
   const handleDragOver = useCallback(() => {
     // Only provide visual feedback, don't update state here
@@ -166,17 +166,17 @@ export function KanbanShell() {
 
     if (!over || active.id === over.id) return
 
-    const activeTask = tasks.find((task) => task.id === active.id)
+    const activeTask = stableTasks.find((task) => task.id === active.id)
     if (!activeTask) return
 
     const overId = over.id as string
-    const overTask = tasks.find((task) => task.id === overId)
+    const overTask = stableTasks.find((task) => task.id === overId)
     const overColumn = TASK_STATUSES.find((status) => status === overId)
 
     // Case 1: Dropped over another task (reorder within same status or move between statuses)
     if (overTask) {
       const targetStatus = overTask.status
-      const targetColumnTasks = tasks.filter((task) => task.status === targetStatus)
+      const targetColumnTasks = stableTasks.filter((task) => task.status === targetStatus)
       const overIndex = targetColumnTasks.findIndex((task) => task.id === over.id)
       
       moveTask({
@@ -187,14 +187,14 @@ export function KanbanShell() {
     }
     // Case 2: Dropped over a column (move to end of that column)
     else if (overColumn) {
-      const targetColumnTasks = tasks.filter((task) => task.status === overColumn)
+      const targetColumnTasks = stableTasks.filter((task) => task.status === overColumn)
       moveTask({
         taskId: activeTask.id,
         status: overColumn,
         position: targetColumnTasks.length,
       })
     }
-  }, [tasks, moveTask])
+  }, [stableTasks, moveTask])
 
   return (
     <DndContext
