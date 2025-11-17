@@ -1,5 +1,5 @@
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -10,7 +10,6 @@ import {
 } from '@dnd-kit/core'
 import type {
   DragEndEvent,
-  DragOverEvent,
   DragStartEvent,
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
@@ -133,38 +132,22 @@ export function KanbanShell() {
     }))
   }, [tasks])
 
-  function handleDragStart(event: DragStartEvent) {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event
     const task = tasks.find((task) => task.id === active.id)
     setActiveTask(task || null)
-  }
+  }, [tasks])
 
-  function handleDragOver(event: DragOverEvent) {
-    const { active, over } = event
-    if (!over) return
+  const handleDragOver = useCallback(() => {
+    // Only provide visual feedback, don't update state here
+    // State updates will be handled in handleDragEnd
+  }, [])
 
-    const activeTask = tasks.find((task) => task.id === active.id)
-    if (!activeTask) return
-
-    const overId = over.id as string
-    const overColumn = TASK_STATUSES.find((status) => status === overId)
-
-    // If dropped over a column, move to that status
-    if (overColumn && activeTask.status !== overColumn) {
-      const targetColumnTasks = tasks.filter((task) => task.status === overColumn)
-      moveTask({
-        taskId: activeTask.id,
-        status: overColumn,
-        position: targetColumnTasks.length,
-      })
-    }
-  }
-
-  function handleDragEnd(event: DragEndEvent) {
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
     setActiveTask(null)
 
-    if (!over) return
+    if (!over || active.id === over.id) return
 
     const activeTask = tasks.find((task) => task.id === active.id)
     if (!activeTask) return
@@ -173,22 +156,20 @@ export function KanbanShell() {
     const overTask = tasks.find((task) => task.id === overId)
     const overColumn = TASK_STATUSES.find((status) => status === overId)
 
-    // If dropped over another task, reorder within the same status
-    if (overTask && activeTask.status === overTask.status && active.id !== over.id) {
-      const columnTasks = tasks.filter((task) => task.status === activeTask.status)
-      const activeIndex = columnTasks.findIndex((task) => task.id === active.id)
-      const overIndex = columnTasks.findIndex((task) => task.id === over.id)
+    // Case 1: Dropped over another task (reorder within same status or move between statuses)
+    if (overTask) {
+      const targetStatus = overTask.status
+      const targetColumnTasks = tasks.filter((task) => task.status === targetStatus)
+      const overIndex = targetColumnTasks.findIndex((task) => task.id === over.id)
       
-      if (activeIndex !== overIndex) {
-        moveTask({
-          taskId: activeTask.id,
-          status: activeTask.status,
-          position: overIndex,
-        })
-      }
+      moveTask({
+        taskId: activeTask.id,
+        status: targetStatus,
+        position: overIndex,
+      })
     }
-    // If dropped over a column header, move to end of that column
-    else if (overColumn && activeTask.status !== overColumn) {
+    // Case 2: Dropped over a column (move to end of that column)
+    else if (overColumn) {
       const targetColumnTasks = tasks.filter((task) => task.status === overColumn)
       moveTask({
         taskId: activeTask.id,
@@ -196,7 +177,7 @@ export function KanbanShell() {
         position: targetColumnTasks.length,
       })
     }
-  }
+  }, [tasks, moveTask])
 
   return (
     <DndContext
