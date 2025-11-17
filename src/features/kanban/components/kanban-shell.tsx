@@ -18,6 +18,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useKanbanStore } from '@/store/kanban-store'
 import { TASK_STATUSES, type Task, type TaskStatus } from '@/types/kanban'
+import { AddTaskForm } from './add-task-form'
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
   TODO: 'To do',
@@ -95,6 +96,7 @@ function DroppableColumn({ status, tasks, children }: DroppableColumnProps) {
           </p>
           <p className="text-xs text-muted-foreground/80">{tasks.length} tasks</p>
         </div>
+        <AddTaskForm defaultStatus={status} />
       </header>
       <div className="flex flex-1 flex-col gap-3 min-h-[200px]">
         <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
